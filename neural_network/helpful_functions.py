@@ -1,5 +1,3 @@
-# Sensitive info ln 100
-
 import logging
 # import pymysql.cursors
 import os

@@ -11,22 +11,21 @@ import os
 
 
 def train_neural_network(sequences_data, labels):
-    # Convert sequences to a NumPy array
+
     sequences = np.array(sequences_data)
 
-    # Convert sequences to a PyTorch tensor
-    sequences = torch.tensor(sequences, dtype=torch.float)
-    sequences = sequences.view(-1, 1, 43)  # Update the shape to match your sequences
+    sequences = torch.tensor(sequences, dtype=torch.float).cuda()
 
-    # Define the model
-    model = MyModel(input_size=43, hidden_size=32, output_size=3)
+    sequences = sequences.view(-1, 1, 43)
 
-    # Print model summary
+    # Define the model and move it to the GPU
+    model = MyModel(input_size=43, hidden_size=32, output_size=3).cuda()
     print(model)
 
-    # Define loss and optimizer
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters())
+
+    labels = labels.cuda()
 
     # Train the model with your data
     for epoch in range(50):
@@ -37,31 +36,26 @@ def train_neural_network(sequences_data, labels):
             loss = criterion(outputs[i:i + 1], labels[i:i + 1])
             loss.backward()
         optimizer.step()
-        print(f"time for 1 epoch {cur-datetime.datetime.now()}")
+        print(f"time for 1 epoch {datetime.datetime.now() - cur}")
         print(f'Epoch [{epoch + 1}/50], Loss: {loss.item():.4f}')
 
     torch.save(model.state_dict(), 'trained_model.pth')
 
 
 def run_neural_network():
+    """
+    get data from txt files than transform it into data ready to feed to neural network.
+    Account for MANY MANY edge cases
+    Augment data and finally train the model with it
+    :return:
+    """
+    # gets data from txt files
     data = data_file_to_code('data_files/data.txt')
     labels2 = data_file_to_code('data_files/labels.txt')
-    sequences_data2 = total_data_to_sequences(data)
-    sequences_data3 = []
-    for dat in sequences_data2:
-        temp_idk = standardize_data(dat)
-        if isinstance(temp_idk, list):
-            sequences_data3.append(temp_idk)
-    sequences_data = []
-    for temp2 in sequences_data3:
-        check = False
-        for temp3 in temp2:
-            if len(temp3) != 43:
-                check = True
-        if not check:
-            sequences_data.append(temp2)
-        else:
-            check = False
+
+    # Account for edge cases and try to turn original data to data to feed to neural network
+    sequences_data = data_to_sequence_ready_for_nn(data)
+
     new_labels = []
     for label in labels2:
         temp_var = str_to_float_for_nn(label)
@@ -74,7 +68,7 @@ def run_neural_network():
     for seq in sequences_data:
         unit_test_sequences_data(seq)
 
-
+    # Now augment data
     total_data = []
     total_labels = []
     runner = 0
@@ -84,7 +78,6 @@ def run_neural_network():
         try:
             individual_label = new_labels[runner]
             individual_data = sequences_data[runner]
-            # print(individual_data)
             if len(individual_data) > 2:
                 partial_data = AugmentData(
                         data=individual_data,
@@ -101,19 +94,39 @@ def run_neural_network():
         except Exception as e:
             log_it(logger, e)
         runner += 1
+
+    # final unit test
     for temp4 in total_data:
         unit_test_sequences_data(temp4)
     labels = torch.tensor(total_labels, dtype=torch.float)
-    # print(labels)
     train_neural_network(total_data, labels)
 
 
 def load_model():
-    model = MyModel(input_size=42, hidden_size=32, output_size=3)
+    model = MyModel(input_size=43, hidden_size=32, output_size=3)
     model.load_state_dict(torch.load('trained_model.pth'))
     model.eval()
     # print(model)
     return model
+
+
+def data_to_sequence_ready_for_nn(data):
+    sequences_data2 = total_data_to_sequences(data)
+    sequences_data3 = []
+    for dat in sequences_data2:
+        temp_idk = standardize_data(dat)
+        if isinstance(temp_idk, list):
+            sequences_data3.append(temp_idk)
+
+    sequences_data = []
+    for temp2 in sequences_data3:
+        check = False
+        for temp3 in temp2:
+            if len(temp3) != 43:
+                check = True
+        if not check:
+            sequences_data.append(temp2)
+    return sequences_data
 
 
 if __name__ == '__main__':
