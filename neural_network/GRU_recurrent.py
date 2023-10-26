@@ -104,7 +104,7 @@ def run_neural_network():
 
 def load_model():
     model = MyModel(input_size=43, hidden_size=32, output_size=3)
-    model.load_state_dict(torch.load('trained_model.pth'))
+    model.load_state_dict(torch.load(r'F:\Coding\Hand_detection_neural_network\trained_model.pth'))
     model.eval()
     # print(model)
     return model

@@ -10,12 +10,42 @@ import numpy as np
 from neural_network.GRU_recurrent import data_to_sequence_ready_for_nn, load_model
 import torch
 from neural_network.model_outputs import model_output_to_english
+from neural_network.data_transformation import input_from_script_to_nn_ready
+from neural_network.helpful_functions import create_logger_error, log_it
+import os
+
 
 def main_loop_tests():
     """
     This function will run a loop that asks the user to change their hand position and will record the data of the user doing it
     ALSO this function gets your camera and runs some deep learning to figure out the 21 points of your hand
     the points go as follows.
+
+    Input function for neural network This gives the NN the current state of the hand
+        def str_to_float_for_nn(inp):
+    # 1 is hand is in middle 2 is hand is up and 3 is hand is down
+    if inp == 'Start with HAND MIDDLE, ':
+        ret = 1
+    elif inp == 'Start with HAND UP, ':
+        ret = 2
+    else:
+        # hand is down
+        ret = 3
+    return ret
+
+    This is what comes out of the NN so what the NN thinks the current state of the hand is
+    def labels_to_final_label_ready_for_neural_network(labels):
+    new_labels = []
+    for label in labels:
+        if label == 'HAND DOWN':
+            new_labels.append([1.0, 0, 0])
+        elif label == 'HAND UP':
+            new_labels.append([0, 1.0, 0])
+        else:
+            new_labels.append([0, 0, 1.0])
+    return new_labels
+
+
     0: wrist
     1-4 Thumb (from base to tip so 1 is the base of the thumb and 4 is the tip of the thumb)
     5-8 index finger
@@ -28,7 +58,7 @@ def main_loop_tests():
     cap = cv2.VideoCapture(0)
     tracker = handTracker()
 
-    desired_fps = 30
+    desired_fps = 15
 
     frame_accumulator = []  # To store frames for the last 3 seconds
     image_with_hand_accumulator = [] # the image quality is 480 x 640
@@ -40,6 +70,8 @@ def main_loop_tests():
     font_color = (0,0,0)
     data_txt = handle_data('total_data/data.txt')
     labels_txt = handle_data('total_data/labels.txt')
+    current_position = 4
+    english_output = 'IDK'
     while True:
 
         success, image = cap.read()
@@ -57,26 +89,47 @@ def main_loop_tests():
         image_with_hand_accumulator.append(image)
         image = add_text_to_image(image=image, text=text, font_color=font_color)
         cv2.imshow("Video", image)
-        frame_accumulator.append(lmList)
+        if len(lmList) > 10:
+            frame_accumulator.append(lmList)
 
-
+        logger = create_logger_error(os.path.abspath(__file__), 'main_loop_tests')
         # get 21 frames feed to NN see what it says
+        # hand middle is 1, 2 is hand up, and 3 is hand down
+        try:
+            if len(frame_accumulator) >= 21:
+                if len(frame_accumulator) == 22:
+                    frame_accumulator.pop(0)
+                if len(frame_accumulator) == 23:
+                    frame_accumulator.pop(0)
+                    frame_accumulator.pop(0)
+                # frame_accumulator.append(1)
 
-        if len(frame_accumulator) >= 21:
-            if len(frame_accumulator) == 22:
-                frame_accumulator.pop(0)
-            if len(frame_accumulator) == 23:
-                frame_accumulator.pop(0)
-                frame_accumulator.pop(0)
-            frame_accumulator.append(1)
-            data_for_nn = data_to_sequence_ready_for_nn(frame_accumulator)
-            model = load_model()
-            with torch.no_grad():  # Disable gradient computation for inference
-                test_sequences = torch.tensor(data_for_nn, dtype=torch.float)  # Convert test data to a PyTorch tensor
-                test_sequences = test_sequences.view(-1, 1, 43)  # Update the shape to match your sequences
-                predictions = model(test_sequences)
-            out_put = model_output_to_english(predictions)
-            print(out_put)
+                data_for_nn = input_from_script_to_nn_ready(frame_accumulator=frame_accumulator, current_position=current_position)
+                # for x in data_for_nn:
+                #     print(x)
+                model = load_model()
+                with torch.no_grad():  # Disable gradient computation for inference
+                    test_sequences = torch.tensor(data_for_nn, dtype=torch.float)  # Convert test data to a PyTorch tensor
+                    test_sequences = test_sequences.view(-1, 1, 43)  # Update the shape to match your sequences
+                    predictions = model(test_sequences).tolist()[0]
+
+                if predictions[2] < predictions[0] > predictions[1]:
+                    # NN thinks hand is down
+                    current_position = 3
+                    english_output = 'Hand Down'
+                if predictions[0] < predictions[2] > predictions[1]:
+                    # NN thinks hand is middle
+                    current_position = 1
+                    english_output = 'Hand Middle'
+                if predictions[2] < predictions[1] > predictions[0]:
+                    # NN thinks hand is up
+                    current_position = 2
+                    english_output = 'Hand Up'
+                print(predictions)
+                print(english_output)
+                # print(out_put)
+        except Exception as e:
+            log_it(logger, e)
 
 
 

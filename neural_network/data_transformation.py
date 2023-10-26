@@ -236,3 +236,16 @@ def labels_to_final_label_ready_for_neural_network(labels):
         else:
             new_labels.append([0, 0, 1.0])
     return new_labels
+
+
+def input_from_script_to_nn_ready(frame_accumulator, current_position=1):
+    sequences = []
+    for frame in frame_accumulator:
+        individual_sequence = []
+        for individual in frame:
+            individual_sequence.append(individual[1])
+            individual_sequence.append(individual[2])
+        individual_sequence.append(current_position)
+        sequences.append(individual_sequence)
+    unit_test_sequences_data(sequences)
+    return sequences
