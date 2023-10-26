@@ -13,6 +13,7 @@ from neural_network.model_outputs import model_output_to_english
 from neural_network.data_transformation import input_from_script_to_nn_ready
 from neural_network.helpful_functions import create_logger_error, log_it
 import os
+import math
 
 
 def main_loop_tests():
@@ -112,19 +113,30 @@ def main_loop_tests():
                     test_sequences = torch.tensor(data_for_nn, dtype=torch.float)  # Convert test data to a PyTorch tensor
                     test_sequences = test_sequences.view(-1, 1, 43)  # Update the shape to match your sequences
                     predictions = model(test_sequences).tolist()[0]
-
-                if predictions[2] < predictions[0] > predictions[1]:
-                    # NN thinks hand is down
-                    current_position = 3
-                    english_output = 'Hand Down'
-                if predictions[0] < predictions[2] > predictions[1]:
-                    # NN thinks hand is middle
-                    current_position = 1
-                    english_output = 'Hand Middle'
-                if predictions[2] < predictions[1] > predictions[0]:
-                    # NN thinks hand is up
+                pred_1 = abs(predictions[1])
+                pred_2 = abs(predictions[2])
+                pred_0 = abs(predictions[0])
+                if pred_1 > 0.6:
                     current_position = 2
                     english_output = 'Hand Up'
+                elif pred_0 > 0.55:
+                    current_position = 3
+                    english_output = 'Hand Down'
+                else:
+                    current_position = 1
+                    english_output = 'Hand Middle'
+                # if pred_2 < pred_0 > pred_1:
+                #     # NN thinks hand is down
+                #     current_position = 3
+                #     english_output = 'Hand Down'
+                # if pred_0 < pred_2 > pred_1:
+                #     # NN thinks hand is middle
+                #     current_position = 1
+                #     english_output = 'Hand Middle'
+                # if pred_2 < pred_1 > pred_0:
+                #     # NN thinks hand is up
+                #     current_position = 2
+                #     english_output = 'Hand Up'
                 print(predictions)
                 print(english_output)
                 # print(out_put)
